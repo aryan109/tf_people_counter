@@ -1,0 +1,6 @@
+1) debug output and analyze the result 
+2) find required stats
+3) send data to FFMPEG server
+
+problem : bounding boxes is not drawing 
+        
