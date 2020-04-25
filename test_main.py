@@ -123,7 +123,7 @@ def infer_on_stream(args):#argument client removed for testing
             'frame_buffer' : 0}
     person_detected = False
     people_count = 0
-    frame_thresh = 5
+    frame_thresh = 30
 
     
     # Initialise the class
