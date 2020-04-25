@@ -3,7 +3,7 @@ import cv2
 from test_infer import Network
 import numpy as np
 
-INPUT_STREAM = "test2.mp4"
+INPUT_STREAM = "edit_test.mp4"
 CPU_EXTENSION = "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
 OB_MODEL = "/home/workspace/model/MobileNetSSD_deploy10695.xml"
 
@@ -37,6 +37,33 @@ def get_args():
 
     return args
 
+def get_stat(stat, frame_no, people_count, frame_thresh, person_detected):
+    
+    if stat['is_person_present'] is False and person_detected is True :
+        stat['is_person_present'] = True
+        stat['begin_frame'] = frame_no
+        stat['end_frame'] = 0
+        stat['frame_duration'] = 1
+        people_count += 1
+
+    if stat['is_person_present'] is True and person_detected is False:
+        diff =frame_no - (stat['begin_frame'] + stat['frame_duration'])
+        if diff >= frame_thresh:
+            stat['is_person_present'] = False
+            stat['end_frame'] = frame_no
+            stat['frame_duration'] = 0
+            stat['frame_buffer'] = 0
+
+        else:
+            stat['frame_buffer'] += 1
+
+    if stat['is_person_present'] is True and person_detected is True :
+        stat['frame_duration'] = stat['frame_duration'] + 1 + stat['frame_buffer']
+        stat['frame_buffer']  = 0  
+   
+    return stat, people_count
+
+
 
 def convert_color(color_string):
     '''
@@ -51,21 +78,24 @@ def convert_color(color_string):
         return colors['BLUE']
 
 
-def draw_boxes(frame, result, args, width, height, prob_threshold):
+def draw_boxes(frame, result, args, width, height, prob_threshold, person_detected):
     '''
     Draw bounding boxes onto the frame.
     '''
+    person_detected = False
     for box in result[0][0]: # Output shape is 1x1x100x7
+
         if int(box[1]) == 1 :
             conf = box[2]
             if conf >= prob_threshold:
+                person_detected = True
                 xmin = int(box[3] * width)
                 ymin = int(box[4] * height)
                 xmax = int(box[5] * width)
                 ymax = int(box[6] * height)
                 cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0,0,255,1))
 
-    return frame
+    return frame, person_detected
 
 
 def connect_mqtt():
@@ -85,6 +115,17 @@ def infer_on_stream(args):#argument client removed for testing
     :param client: MQTT client
     :return: None
     """
+    frame_no = 0
+    stat = {'is_person_present' : False,
+            'begin_frame' : 0,
+            'end_frame' : 0,
+            'frame_duration' : 0,
+            'frame_buffer' : 0}
+    person_detected = False
+    people_count = 0
+    frame_thresh = 5
+
+    
     # Initialise the class
     infer_network = Network()
     # Set Probability threshold for detections
@@ -102,7 +143,7 @@ def infer_on_stream(args):#argument client removed for testing
     width = int(cap.get(3))
     height = int(cap.get(4))
     # Create a video writer for the output video
-    out = cv2.VideoWriter('out1.mp4', 0x00000021, 30, (width,height))
+    out = cv2.VideoWriter('out4.mp4', 0x00000021, 30, (width,height))
     k = 0
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
@@ -123,17 +164,26 @@ def infer_on_stream(args):#argument client removed for testing
         ### TODO: Start asynchronous inference for specified request ###
   
         tmp_net = infer_network.exec_net(p_frame)# tmp_net = exec_net 
-
+        
         ### TODO: Wait for the result ###
         if infer_network.wait(tmp_net) == 0:
             result = infer_network.get_output()              
-            resframe = draw_boxes(frame, result, args, width, height,prob_threshold)          
-            out.write(resframe)
+            resframe,person_detected = draw_boxes(frame, result, args, width, height,prob_threshold,person_detected)
             
+            
+            frame_no +=1
+            
+            stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected)
+            
+            resStr = 'stats is {} \n person counted = {}'.format(stat, people_count)
+            cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
+            out.write(resframe)
             #break if escape key is pressed
+            
             if key_pressed == 27:
                 break
     out.release()
+    print('stats is {} \n person counted = {}'.format(stat, people_count))
     return
 
 
