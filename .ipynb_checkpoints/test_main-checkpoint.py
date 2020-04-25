@@ -3,7 +3,7 @@ import cv2
 from test_infer import Network
 import numpy as np
 
-INPUT_STREAM = "edit_test.mp4"
+INPUT_STREAM = "test2.mp4"
 CPU_EXTENSION = "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
 OB_MODEL = "/home/workspace/model/MobileNetSSD_deploy10695.xml"
 
@@ -32,7 +32,7 @@ def get_args():
     optional.add_argument("-i", help=i_desc, default=INPUT_STREAM)
     optional.add_argument("-d", help=d_desc, default='CPU')
     optional.add_argument("-c", help=c_desc, default='BLUE')
-    optional.add_argument("-ct", help=ct_desc, default=0.2)
+    optional.add_argument("-ct", help=ct_desc, default=0.5)
     args = parser.parse_args()
 
     return args
@@ -51,14 +51,14 @@ def convert_color(color_string):
         return colors['BLUE']
 
 
-def draw_boxes(frame, result, args, width, height):
+def draw_boxes(frame, result, args, width, height, prob_threshold):
     '''
     Draw bounding boxes onto the frame.
     '''
     for box in result[0][0]: # Output shape is 1x1x100x7
         if int(box[1]) == 1 :
             conf = box[2]
-            if conf >= args.ct:
+            if conf >= prob_threshold:
                 xmin = int(box[3] * width)
                 ymin = int(box[4] * height)
                 xmax = int(box[5] * width)
@@ -88,7 +88,7 @@ def infer_on_stream(args):#argument client removed for testing
     # Initialise the class
     infer_network = Network()
     # Set Probability threshold for detections
-    prob_threshold = float(0.3)  #args.prob_threshold hardcoded for testing
+    prob_threshold = args.ct  #args.prob_threshold hardcoded for testing
 
     ### TODO: Load the model through `infer_network` ###
     infer_network.load_model()
@@ -102,7 +102,7 @@ def infer_on_stream(args):#argument client removed for testing
     width = int(cap.get(3))
     height = int(cap.get(4))
     # Create a video writer for the output video
-    out = cv2.VideoWriter('out4.mp4', 0x00000021, 30, (width,height))
+    out = cv2.VideoWriter('out1.mp4', 0x00000021, 30, (width,height))
     k = 0
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
@@ -110,7 +110,6 @@ def infer_on_stream(args):#argument client removed for testing
         
         # Read the next frame
         flag, frame = cap.read()
-#         print('frame {} , flag {}'.format(k,flag))
         if not flag:
             break
         key_pressed = cv2.waitKey(60)
@@ -128,7 +127,7 @@ def infer_on_stream(args):#argument client removed for testing
         ### TODO: Wait for the result ###
         if infer_network.wait(tmp_net) == 0:
             result = infer_network.get_output()              
-            resframe = draw_boxes(frame, result, args, width, height)          
+            resframe = draw_boxes(frame, result, args, width, height,prob_threshold)          
             out.write(resframe)
             
             #break if escape key is pressed
