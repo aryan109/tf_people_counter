@@ -7,6 +7,8 @@ import socket
 import json
 import logging as log
 import paho.mqtt.client as mqtt
+import sys #for ffmpeg server
+
 
 from argparse import ArgumentParser
 
@@ -174,8 +176,13 @@ def infer_on_stream(args,client):#argument client removed for testing
         
         # Read the next frame
         flag, frame = cap.read()
+        
+        
+        
         if not flag:
             break
+            
+
         key_pressed = cv2.waitKey(60)
         
         ### TODO: Pre-process the image as needed ###
@@ -208,10 +215,15 @@ def infer_on_stream(args,client):#argument client removed for testing
             else:
                 current_count = 0
             total_count = people_count
-            duration = stat['frame_duration']/30
+            duration = int(stat['frame_duration']/24)
 #             print('current count:{}  total_count:{}  duration:{}'.format(current_count, total_count, duration))
             client.publish("person", json.dumps({"count": current_count, "total": total_count}))
             client.publish("person/duration", json.dumps({"duration": duration}))
+            
+            ### TODO: Send the frame to the FFMPEG server ###
+            
+            sys.stdout.buffer.write(frame)  
+            sys.stdout.flush()
             
             if key_pressed == 27:
                 break
