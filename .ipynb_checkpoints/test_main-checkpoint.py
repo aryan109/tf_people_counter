@@ -202,16 +202,26 @@ def infer_on_stream(args):#argument client removed for testing
             cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
             out.write(resframe)
             #break if escape key is pressed
+            ### current_count, total_count and duration to the MQTT server ###
+            if stat['is_person_present'] == True :
+                current_count = 1
+            else:
+                current_count = 0
+            total_count = people_count
+            duration = stat['frame_duration']/30
+#             print('current count:{}  total_count:{}  duration:{}'.format(current_count, total_count, duration))
             
             if key_pressed == 27:
                 break
     out.release()
-    print('stats is {} \n person counted = {}'.format(stat, people_count))
+#     print('stats is {} \n person counted = {}'.format(stat, people_count))
     return
 
 
 def main():
-    args = get_args()
+    args = get_args() # FIXME add Build_parser
+#     client = connect_mqtt()
+#     infer_on_stream(args,client)
     infer_on_stream(args)
 
 
