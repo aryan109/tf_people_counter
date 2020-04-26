@@ -129,7 +129,7 @@ def connect_mqtt():
     return client
 
 
-def infer_on_stream(args):#argument client removed for testing
+def infer_on_stream(args,client):#argument client removed for testing
     """
     Initialize the inference network, stream video to network,
     and output stats and video.
@@ -210,19 +210,23 @@ def infer_on_stream(args):#argument client removed for testing
             total_count = people_count
             duration = stat['frame_duration']/30
 #             print('current count:{}  total_count:{}  duration:{}'.format(current_count, total_count, duration))
+            client.publish("person", json.dumps({"count": current_count, "total": total_count}))
+            client.publish("person/duration", json.dumps({"duration": duration}))
             
             if key_pressed == 27:
                 break
     out.release()
+    client.disconnect()
+    cap.release()
 #     print('stats is {} \n person counted = {}'.format(stat, people_count))
     return
 
 
 def main():
     args = get_args() # FIXME add Build_parser
-#     client = connect_mqtt()
-#     infer_on_stream(args,client)
-    infer_on_stream(args)
+    client = connect_mqtt()
+    infer_on_stream(args,client)
+#     infer_on_stream(args)
 
 
 if __name__ == "__main__":
