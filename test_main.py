@@ -2,6 +2,15 @@ import argparse
 import cv2
 from test_infer import Network
 import numpy as np
+import time
+import socket
+import json
+import logging as log
+import paho.mqtt.client as mqtt
+
+from argparse import ArgumentParser
+
+
 
 INPUT_STREAM = "edit_test.mp4"
 CPU_EXTENSION = "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
