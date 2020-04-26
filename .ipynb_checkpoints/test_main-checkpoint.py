@@ -22,6 +22,14 @@ INPUT_STREAM = "edit_test.mp4"
 CPU_EXTENSION = "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
 OB_MODEL = "/home/workspace/model/MobileNetSSD_deploy10695.xml"
 
+def connect_mqtt():
+    ### TODO: Connect to the MQTT client ###
+    client = mqtt.Client()
+    client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_INTERVAL)
+
+    return client
+
+
 def get_args():
     '''
     Gets the arguments from the command line.
