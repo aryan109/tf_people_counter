@@ -45,13 +45,13 @@ class Network:
         self.infer_request = None
         self.input_shape = None
         
-    def load_model(self):
+    def load_model(self, model, args):
         ### TODO: Load the model ###
         plugin = IECore()
-        model_xml = "/home/workspace/model/MobileNetSSD_deploy10695.xml"
-        model_bin = "/home/workspace/model/MobileNetSSD_deploy10695.bin"
+        model_xml = model
+        model_bin = os.path.splitext(model_xml)[0] + ".bin"
         net = IENetwork(model=model_xml, weights=model_bin)
-        plugin.add_extension(CPU_EXTENSION, "CPU")#must add
+        
         
         ### TODO: Check for supported layers ###
         supported_layers = plugin.query_network(network=net, device_name="CPU")
@@ -60,19 +60,19 @@ class Network:
         if len(unsupported_layers) != 0:
             print("Unsupported layers found: {}".format(unsupported_layers))
             print("Check whether extensions are available to add to IECore.")
-            exit(1)
-        ### TODO: Add any necessary extensions ###
-        ### TODO: Return the loaded inference plugin ###
+            plugin.add_extension(args.cpu_extension, "")#must add
+        # Add any necessary extensions #
+        
         
         self.exec_network = plugin.load_network(net, "CPU")
-        print("IR successfully loaded into Inference Engine.")
+        # Return the loaded inference plugin
         self.plugin = plugin
         self.network = net
         
         self.input_blob = next(iter(net.inputs))#added
         self.output_blob = next(iter(self.network.outputs))
         self.input_shape = net.inputs[self.input_blob].shape
-        ### Note: You may need to update the function parameters. ###
+        # update the function parameters.
         return
 
     def get_input_shape(self):
@@ -84,13 +84,11 @@ class Network:
         exec_network = self.exec_network
         input_blob = self.input_blob
         exec_network.start_async(request_id = 0, inputs = {input_blob : image})
+        self.wait(exec_network)
         
         self.exec_network = exec_network
-        
-        
-        
-        ### TODO: Return any necessary information ###
-        ### Note: You may need to update the function parameters. ###
+            
+        # Return exec_network 
         return exec_network
 
     def wait(self, exec_network):
@@ -102,8 +100,7 @@ class Network:
             else:
                 time.sleep(1)
             
-        ### TODO: Return any necessary information ###
-        ### Note: You may need to update the function parameters. ###
+        # Return status
         return status
 
     def get_output(self):

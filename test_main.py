@@ -10,6 +10,32 @@ import paho.mqtt.client as mqtt
 import sys #for ffmpeg server
 
 
+def build_argparser():
+    """
+    Parse command line arguments.
+
+    :return: command line arguments
+    """
+    parser = ArgumentParser()
+    parser.add_argument("-m", "--model", required=True, type=str,
+                        help="Path to an xml file with a trained model.")
+    parser.add_argument("-i", "--input", required=True, type=str,
+                        help="Path to image or video file")
+    parser.add_argument("-l", "--cpu_extension", required=False, type=str,
+                        default=None,
+                        help="MKLDNN (CPU)-targeted custom layers."
+                             "Absolute path to a shared library with the"
+                             "kernels impl.")
+    parser.add_argument("-d", "--device", type=str, default="CPU",
+                        help="Specify the target device to infer on: "
+                             "CPU, GPU, FPGA or MYRIAD is acceptable. Sample "
+                             "will look for a suitable plugin for device "
+                             "specified (CPU by default)")
+    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
+                        help="Probability threshold for detections filtering"
+                        "(0.5 by default)")
+    return parser
+
 from argparse import ArgumentParser
 
 # MQTT server environment variables
@@ -90,18 +116,6 @@ def get_stat(stat, frame_no, people_count, frame_thresh, person_detected):
 
 
 
-def convert_color(color_string):
-    '''
-    Get the BGR value of the desired bounding box color.
-    Defaults to Blue if an invalid color is given.
-    '''
-    colors = {"BLUE": (255,0,0), "GREEN": (0,255,0), "RED": (0,0,255)}
-    out_color = colors.get(color_string)
-    if out_color:
-        return out_color
-    else:
-        return colors['BLUE']
-
 
 def draw_boxes(frame, result, args, width, height, prob_threshold, person_detected):
     '''
@@ -131,7 +145,7 @@ def connect_mqtt():
     return client
 
 
-def infer_on_stream(args,client):#argument client removed for testing
+def infer_on_stream(args,client):
     """
     Initialize the inference network, stream video to network,
     and output stats and video.
@@ -148,9 +162,9 @@ def infer_on_stream(args,client):#argument client removed for testing
             'frame_buffer' : 0}
     person_detected = False
     people_count = 0
-    frame_thresh = 30
+    frame_thresh = 25
     prev_total_count = 0
-    curr_total_count = 0 ### FIXME
+    curr_total_count = 0 
     last_count = 0
     current_count = 0
 
@@ -172,7 +186,7 @@ def infer_on_stream(args,client):#argument client removed for testing
     width = int(cap.get(3))
     height = int(cap.get(4))
     # Create a video writer for the output video
-#     out = cv2.VideoWriter('out4.mp4', 0x00000021, 30, (width,height))
+    out = cv2.VideoWriter('out4.mp4', 0x00000021, 30, (width,height))
     k = 0
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
@@ -203,17 +217,14 @@ def infer_on_stream(args,client):#argument client removed for testing
         if infer_network.wait(tmp_net) == 0:
             result = infer_network.get_output()              
             resframe,person_detected = draw_boxes(frame, result, args, width, height,prob_threshold,person_detected)
-            frame_arr = np.array(frame)
-            print('shape of frame is {}'.format(frame_arr.shape))
-            
             
             frame_no +=1
             
             stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected)
             
             resStr = 'stats is {} \n person counted = {}'.format(stat, people_count)
-#             cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
-#             out.write(resframe)
+            cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
+            out.write(resframe)
             #break if escape key is pressed
             ### current_count, total_count and duration to the MQTT server ###
             last_count = current_count
@@ -251,7 +262,7 @@ def infer_on_stream(args,client):#argument client removed for testing
             
             if key_pressed == 27:
                 break
-#     out.release()
+    out.release()
     client.disconnect()
     cap.release()
 #     print('stats is {} \n person counted = {}'.format(stat, people_count))
@@ -260,6 +271,7 @@ def infer_on_stream(args,client):#argument client removed for testing
 
 def main():
     args = get_args() # FIXME add Build_parser
+#     args = build_argparser().parse_args()
     client = connect_mqtt()
     infer_on_stream(args,client)
 #     infer_on_stream(args)

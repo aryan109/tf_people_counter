@@ -69,14 +69,14 @@ def build_argparser():
                         "(0.5 by default)")
     return parser
 
-def draw_boxes(frame, result, args, width, height):#draw boxes
+def draw_boxes(frame, result, args, width, height,prob_threshold, person_detected):#draw boxes
     '''
     draw bounding boxes onto the frame
     '''
     for box in result[0][0]: #output shape is 1x1x100x7
         conf = box[2] #confidence score
         '''box[1] contain class'''
-        if conf >= 0.5:
+        if conf >= prob_threshold:
             xmin = int(box[3] * width)
             ymin = int(box[4] * height)
             xmax = int(box[5] * width)
@@ -102,18 +102,38 @@ def infer_on_stream(args, client):
     :param client: MQTT client
     :return: None
     """
+    """
+    variables to use
+    """
+    frame_no = 0 #keep track of current frame number
+    
+    #stores the calculated stats
+    stat = {'is_person_present' : False, 
+            'begin_frame' : 0,
+            'end_frame' : 0,
+            'frame_duration' : 0,
+            'frame_buffer' : 0}
+    person_detected = False #true if person got detected in current frame
+    people_count = 0 #total number of people counted
+    frame_thresh = 25 #to avoid error in people count
+    prev_total_count = 0 # total count in previous frame
+    curr_total_count = 0 # total count in current frame
+    last_count = 0 # no. of people counted in previous frame
+    current_count = 0 # no.of people counted in current frame
+    
+    
     # Initialise the class
     infer_network = Network()
     # Set Probability threshold for detections
     prob_threshold = args.prob_threshold
 
-    ### TODO: Load the model through `infer_network` ###
-    infer_network.load_model()
+    # Load the model through `infer_network`
+    infer_network.load_model(args.model,args)
     net_input_shape = infer_network.get_input_shape()
-    ### TODO: Handle the input stream ###
-    
-    # Get and open video capture
+    # Handle the input stream 
     cap = cv2.VideoCapture(args.i)
+    # Get and open video capture
+    
     cap.open(args.i)
     # Grab the shape of the input 
     width = int(cap.get(3))
@@ -121,7 +141,7 @@ def infer_on_stream(args, client):
     # Create a video writer for the output video
     out = cv2.VideoWriter('out.mp4', 0x00000021, 30, (width,height))
     
-    ### TODO: Loop until stream is over ###
+    # Loop until stream is over 
     while cap.isOpened():
         ### TODO: Read from the video capture ###
         
@@ -131,42 +151,62 @@ def infer_on_stream(args, client):
             break
         key_pressed = cv2.waitKey(60)
         
-        ### TODO: Pre-process the image as needed ###
+        # Pre-process the image as needed 
 
         p_frame = cv2.resize(frame, (net_input_shape[3], net_input_shape[2]))
         p_frame = p_frame.transpose((2,0,1))
         p_frame = p_frame.reshape(1, *p_frame.shape)        
         
-        ### TODO: Start asynchronous inference for specified request ###
+        # Start asynchronous inference for specified request 
   
         tmp_net = infer_network.async_inference(p_frame)# tmp_net = exec_net 
 
-        ### TODO: Wait for the result ###
-        if infer_network.wait() == 0:
-            result = infer_network.extract_output()
-            frame = draw_boxes(frame, result, args, width, hieght)
+        # Wait for the result
+        if infer_network.wait(tmp_net) == 0:
+            #  Get the results of the inference request
+            result = infer_network.get_output()
+            resframe, person_detected = draw_boxes(frame, result, args, width, hieght, prob_threshold,person_detected)
             
-           #write output frame
-            out.write(frame)
-           #break if escape key is pressed
+           # write output frame
+            out.write(resframe)
+           # Extract desired stats from the results
+            stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected)
+            
+            last_count = current_count
+            if stat['is_person_present'] == True :
+                current_count = 1
+            else:
+                current_count = 0
+            total_count = people_count
+            prev_total_count = curr_total_count
+            curr_total_count = total_count
+            
+            ### send information to the MQTT server ###
+            # When new person enters the video
+            if current_count > last_count:
+                start_time = time.time()
+                total_count = total_count + current_count - last_count
+                client.publish("person", json.dumps({"total": total_count}))
+            # Person duration in the video is calculated
+            if current_count < last_count:
+                duration = int(time.time() - start_time)
+                # Publish messages to the MQTT server
+                client.publish("person/duration",json.dumps({"duration": duration}))
+                
+            client.publish("person", json.dumps({"count": current_count}))
+            
+            # break if escape key is pressed
+            # Send the frame to the FFMPEG server
+            sys.stdout.buffer.write(frame)  
+            sys.stdout.flush()
+            
             if key_pressed == 27:
                 break
-            
-        
-        
-            ### TODO: Get the results of the inference request ###
 
-            ### TODO: Extract any desired stats from the results ###
-
-            ### TODO: Calculate and send relevant information on ###
-            ### current_count, total_count and duration to the MQTT server ###
-            ### Topic "person": keys of "count" and "total" ###
-            ### Topic "person/duration": key of "duration" ###
-
-        ### TODO: Send the frame to the FFMPEG server ###
-
-        ### TODO: Write an output image if `single_image_mode` ###
+        ### TODO: Write an output image if `single_image_mode` ### #fixme
         out.release()
+        client.disconnect()
+        cap.release()
         return
 
 
