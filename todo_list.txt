@@ -1,9 +1,5 @@
-1) optimize ffmpeg pipeline command 
-2) fix error :
-[rawvideo @ 0x1fd8d80] Invalid buffer size, packet size 663661 < expected frame_size 995328
-Error while decoding stream #0:0: Invalid argument
-
-problem : video output to app is iproper
-           total count at app showing is incorrect
+1) change average duraation code
+2) use better model with high accuracy
+problem : incorrect avg-duration,
            
         
