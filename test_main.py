@@ -46,7 +46,7 @@ MQTT_PORT = 3001
 MQTT_KEEPALIVE_INTERVAL = 60
 
 
-INPUT_STREAM = "edit_test.mp4"
+INPUT_STREAM = "resources/Pedestrian_Detect_2_1_1.mp4"
 CPU_EXTENSION = "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
 OB_MODEL = "/home/workspace/model/MobileNetSSD_deploy10695.xml"
 
@@ -83,7 +83,7 @@ def get_args():
     optional.add_argument("-i", help=i_desc, default=INPUT_STREAM)
     optional.add_argument("-d", help=d_desc, default='CPU')
     optional.add_argument("-c", help=c_desc, default='BLUE')
-    optional.add_argument("-ct", help=ct_desc, default=0.5)
+    optional.add_argument("-ct", help=ct_desc, default=0.3)
     args = parser.parse_args()
 
     return args
@@ -186,7 +186,7 @@ def infer_on_stream(args,client):
     width = int(cap.get(3))
     height = int(cap.get(4))
     # Create a video writer for the output video
-    out = cv2.VideoWriter('out4.mp4', 0x00000021, 30, (width,height))
+    out = cv2.VideoWriter('out.mp4', 0x00000021, 30, (width,height))
     k = 0
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
