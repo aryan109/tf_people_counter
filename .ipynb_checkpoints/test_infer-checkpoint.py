@@ -53,21 +53,21 @@ class Network:
         model_xml = "tf_model/frozen_inference_graph.xml"
         model_bin = "tf_model/frozen_inference_graph.bin"
         net = IENetwork(model=model_xml, weights=model_bin)
-        plugin.add_extension(CPU_EXTENSION, "CPU")
+#         plugin.add_extension(CPU_EXTENSION, "CPU")
         
         ### TODO: Check for supported layers ###
         supported_layers = plugin.query_network(network=net, device_name="CPU")
         
         unsupported_layers = [l for l in net.layers.keys() if l not in supported_layers]
         if len(unsupported_layers) != 0:
-            print("Unsupported layers found: {}".format(unsupported_layers))
-            print("Check whether extensions are available to add to IECore.")
-            exit(1)
+            plugin.add_extension(CPU_EXTENSION, "CPU")
+            
+            
         ### TODO: Add any necessary extensions ###
         ### TODO: Return the loaded inference plugin ###
         
         self.exec_network = plugin.load_network(net, "CPU")
-        print("IR successfully loaded into Inference Engine.")
+#         print("IR successfully loaded into Inference Engine.")
         self.plugin = plugin
         self.network = net
         
@@ -75,8 +75,8 @@ class Network:
         self.output_blob = next(iter(net.outputs))
         self.input_shape = net.inputs[self.input_blob].shape
         output_shape = net.outputs[self.output_blob].shape
-        print('input shape is {}'.format(self.input_shape))
-        print('output shape is {}'.format(output_shape))
+#         print('input shape is {}'.format(self.input_shape))
+#         print('output shape is {}'.format(output_shape))
         ### Note: You may need to update the function parameters. ###
         return
 

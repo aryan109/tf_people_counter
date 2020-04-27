@@ -149,6 +149,8 @@ def infer_on_stream(args,client):#argument client removed for testing
     person_detected = False
     people_count = 0
     frame_thresh = 30
+    prev_total_count = 0
+    curr_total_count = 0 ### FIXME
 
     
     # Initialise the class
@@ -168,7 +170,7 @@ def infer_on_stream(args,client):#argument client removed for testing
     width = int(cap.get(3))
     height = int(cap.get(4))
     # Create a video writer for the output video
-    out = cv2.VideoWriter('out4.mp4', 0x00000021, 30, (width,height))
+#     out = cv2.VideoWriter('out4.mp4', 0x00000021, 30, (width,height))
     k = 0
     ### TODO: Loop until stream is over ###
     while cap.isOpened():
@@ -199,6 +201,8 @@ def infer_on_stream(args,client):#argument client removed for testing
         if infer_network.wait(tmp_net) == 0:
             result = infer_network.get_output()              
             resframe,person_detected = draw_boxes(frame, result, args, width, height,prob_threshold,person_detected)
+            frame_arr = np.array(frame)
+            print('shape of frame is {}'.format(frame_arr.shape))
             
             
             frame_no +=1
@@ -206,8 +210,8 @@ def infer_on_stream(args,client):#argument client removed for testing
             stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected)
             
             resStr = 'stats is {} \n person counted = {}'.format(stat, people_count)
-            cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
-            out.write(resframe)
+#             cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
+#             out.write(resframe)
             #break if escape key is pressed
             ### current_count, total_count and duration to the MQTT server ###
             if stat['is_person_present'] == True :
@@ -215,6 +219,8 @@ def infer_on_stream(args,client):#argument client removed for testing
             else:
                 current_count = 0
             total_count = people_count
+            
+            
             duration = int(stat['frame_duration']/24)
 #             print('current count:{}  total_count:{}  duration:{}'.format(current_count, total_count, duration))
             client.publish("person", json.dumps({"count": current_count, "total": total_count}))
