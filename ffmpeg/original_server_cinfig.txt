@@ -9,7 +9,7 @@ CustomLog -
 # Feed/Raw video
 <Feed fac.ffm>
 File fac.ffm
-FileMaxSize 20M
+FileMaxSize 16M
 ACL allow 127.0.0.1
 </Feed>
 
