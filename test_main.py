@@ -162,7 +162,7 @@ def infer_on_stream(args,client):
             'frame_buffer' : 0}
     person_detected = False
     people_count = 0
-    frame_thresh = 25
+    frame_thresh = 10
     prev_total_count = 0
     curr_total_count = 0 
     last_count = 0
@@ -222,11 +222,6 @@ def infer_on_stream(args,client):
             
             stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected)
             
-            resStr = 'stats is {} \n person counted = {}'.format(stat, people_count)
-            cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
-            out.write(resframe)
-            #break if escape key is pressed
-            ### current_count, total_count and duration to the MQTT server ###
             last_count = current_count
             if stat['is_person_present'] == True :
                 current_count = 1
@@ -251,6 +246,14 @@ def infer_on_stream(args,client):
                                json.dumps({"duration": duration}))
              
             client.publish("person", json.dumps({"count": current_count}))
+            
+            
+            resStr = 'stats is {} \n person counted = {}'.format(stat, people_count)
+            cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
+            out.write(resframe)
+            #break if escape key is pressed
+            ### current_count, total_count and duration to the MQTT server ###
+
 #             print('current count:{}  total_count:{}  duration:{}'.format(current_count, total_count, duration))
 #             client.publish("person", json.dumps({"count": current_count, "total": total_count}))
 #             client.publish("person/duration", json.dumps({"duration": duration}))
