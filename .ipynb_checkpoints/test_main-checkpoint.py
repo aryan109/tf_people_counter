@@ -151,6 +151,8 @@ def infer_on_stream(args,client):#argument client removed for testing
     frame_thresh = 30
     prev_total_count = 0
     curr_total_count = 0 ### FIXME
+    last_count = 0
+    current_count = 0
 
     
     # Initialise the class
@@ -214,17 +216,33 @@ def infer_on_stream(args,client):#argument client removed for testing
 #             out.write(resframe)
             #break if escape key is pressed
             ### current_count, total_count and duration to the MQTT server ###
+            last_count = current_count
             if stat['is_person_present'] == True :
                 current_count = 1
             else:
                 current_count = 0
             total_count = people_count
+            prev_total_count = curr_total_count
+            curr_total_count = total_count
+#             duration = int(stat['frame_duration']/24)
             
+# When new person enters the video
+            if current_count > last_count:
+                start_time = time.time()
+                total_count = total_count + current_count - last_count
+                client.publish("person", json.dumps({"total": total_count}))
             
-            duration = int(stat['frame_duration']/24)
+            # Person duration in the video is calculated
+            if current_count < last_count:
+                duration = int(time.time() - start_time)
+                # Publish messages to the MQTT server
+                client.publish("person/duration",
+                               json.dumps({"duration": duration}))
+             
+            client.publish("person", json.dumps({"count": current_count}))
 #             print('current count:{}  total_count:{}  duration:{}'.format(current_count, total_count, duration))
-            client.publish("person", json.dumps({"count": current_count, "total": total_count}))
-            client.publish("person/duration", json.dumps({"duration": duration}))
+#             client.publish("person", json.dumps({"count": current_count, "total": total_count}))
+#             client.publish("person/duration", json.dumps({"duration": duration}))
             
             ### TODO: Send the frame to the FFMPEG server ###
             
@@ -233,7 +251,7 @@ def infer_on_stream(args,client):#argument client removed for testing
             
             if key_pressed == 27:
                 break
-    out.release()
+#     out.release()
     client.disconnect()
     cap.release()
 #     print('stats is {} \n person counted = {}'.format(stat, people_count))
