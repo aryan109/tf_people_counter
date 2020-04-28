@@ -49,12 +49,12 @@ def build_argparser():
     :return: command line arguments
     """
     parser = ArgumentParser()
-    parser.add_argument("-m", "--model", required=True, type=str,
+    parser.add_argument("-m", "--model", required=False, type=str, default = "tf_model/frozen_inference_graph.xml",
                         help="Path to an xml file with a trained model.")
-    parser.add_argument("-i", "--input", required=True, type=str,
+    parser.add_argument("-i", "--input", required=False, type=str, default = "resources/Pedestrian_Detect_2_1_1.mp4",
                         help="Path to image or video file")
     parser.add_argument("-l", "--cpu_extension", required=False, type=str,
-                        default=None,
+                        default="/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so",
                         help="MKLDNN (CPU)-targeted custom layers."
                              "Absolute path to a shared library with the"
                              "kernels impl.")
@@ -65,7 +65,7 @@ def build_argparser():
                              "specified (CPU by default)")
     parser.add_argument("-pt", "--prob_threshold", type=float, default=0.3,
                         help="Probability threshold for detections filtering"
-                        "(0.5 by default)")
+                        "(0.3 by default)")
     return parser
 
 
@@ -99,9 +99,7 @@ def get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client)
 
 
 def draw_boxes(frame, result, args, width, height,prob_threshold, person_detected):#draw boxes
-    '''
-    draw bounding boxes onto the frame
-    '''
+
     for box in result[0][0]: #output shape is 1x1x100x7
         if int(box[1]) == 1: # class is human
             conf = box[2] #confidence score
@@ -222,7 +220,7 @@ def infer_on_stream(args, client):
             # Send the frame to the FFMPEG server
             sys.stdout.buffer.write(frame)  
             sys.stdout.flush()
-            
+            print('hii')
             if key_pressed == 27:
                 break
 
