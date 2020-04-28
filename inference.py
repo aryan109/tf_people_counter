@@ -58,17 +58,17 @@ class Network:
 #         plugin.add_extension(CPU_EXTENSION, "CPU")
         
         ### TODO: Check for supported layers ###
-        supported_layers = plugin.query_network(network=net, device_name="CPU")
+        supported_layers = plugin.query_network(network=net, device_name=args.d)
         
         unsupported_layers = [l for l in net.layers.keys() if l not in supported_layers]
         if len(unsupported_layers) != 0:
-            plugin.add_extension(args.l, "CPU")
+            plugin.add_extension(args.l, args.d)
             
             
         ### TODO: Add any necessary extensions ###
         ### TODO: Return the loaded inference plugin ###
         
-        self.exec_network = plugin.load_network(net, "CPU")
+        self.exec_network = plugin.load_network(net, args.d)
 #         print("IR successfully loaded into Inference Engine.")
         self.plugin = plugin
         self.network = net
