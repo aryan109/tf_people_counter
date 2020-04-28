@@ -102,7 +102,7 @@ def draw_boxes(frame, result, args, width, height, prob_threshold, person_detect
 
         if int(box[1]) == 1 :
             conf = box[2]
-            if conf >= prob_threshold:
+            if conf >= 0.3:
                 person_detected = True
                 xmin = int(box[3] * width)
                 ymin = int(box[4] * height)
