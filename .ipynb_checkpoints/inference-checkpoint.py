@@ -25,6 +25,8 @@
 import os
 import sys
 import logging as log
+import numpy as np
+import cv2
 from openvino.inference_engine import IENetwork, IECore
 
 CPU_EXTENSION = "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
@@ -40,68 +42,80 @@ class Network:
         self.plugin = None
         self.network = None
         self.input_blob = None
+        self.input_shape = None
         self.output_blob = None
         self.exec_network = None
         self.infer_request = None
-        self.input_shape = None
         
-    def load_model(self, model, args):
+    def load_model(self, args):
         ### TODO: Load the model ###
         plugin = IECore()
-        model_xml = model
-        model_bin = os.path.splitext(model_xml)[0] + ".bin"
+        model_xml = "tf_model/frozen_inference_graph.xml"
+        model_bin = "tf_model/frozen_inference_graph.bin"
         net = IENetwork(model=model_xml, weights=model_bin)
-        
+#         plugin.add_extension(CPU_EXTENSION, "CPU")
         
         ### TODO: Check for supported layers ###
         supported_layers = plugin.query_network(network=net, device_name="CPU")
         
         unsupported_layers = [l for l in net.layers.keys() if l not in supported_layers]
         if len(unsupported_layers) != 0:
-            plugin.add_extension(args.cpu_extension,"CPU")#must add
-        # Add any necessary extensions #
-        
+            plugin.add_extension(CPU_EXTENSION, "CPU")
+            
+            
+        ### TODO: Add any necessary extensions ###
+        ### TODO: Return the loaded inference plugin ###
         
         self.exec_network = plugin.load_network(net, "CPU")
-        # Return the loaded inference plugin
+#         print("IR successfully loaded into Inference Engine.")
         self.plugin = plugin
         self.network = net
         
         self.input_blob = next(iter(net.inputs))#added
-        self.output_blob = next(iter(self.network.outputs))
+        self.output_blob = next(iter(net.outputs))
         self.input_shape = net.inputs[self.input_blob].shape
-        # update the function parameters.
+        output_shape = net.outputs[self.output_blob].shape
+#         print('input shape is {}'.format(self.input_shape))
+#         print('output shape is {}'.format(output_shape))
+        ### Note: You may need to update the function parameters. ###
         return
 
     def get_input_shape(self):
         ### TODO: Return the shape of the input layer ###
         return self.input_shape
-
-    def exec_net(self, image):
-        ### TODO: Start an asynchronous request ###
-        exec_network = self.exec_network
-        input_blob = self.input_blob
-        exec_network.start_async(request_id = 0, inputs = {input_blob : image})
-        self.wait(exec_network)
-        
-        self.exec_network = exec_network
-            
-        # Return exec_network 
-        return exec_network
-
+    
     def wait(self, exec_network):
-        status = None
+        ### TODO: Wait for the request to be complete. ###
         while True:
             status = exec_network.requests[0].wait(-1)
             if status == 0:
                 break
             else:
                 time.sleep(1)
-            
-        # Return status
+        ### TODO: Return any necessary information ###
+        ### Note: You may need to update the function parameters. ###
         return status
+    
+    
+    def exec_net(self, image):
+        ### TODO: Start an asynchronous request ###
+        exec_network = self.exec_network
+        input_blob = self.input_blob
+        
+        exec_network.start_async(request_id = 0, inputs = {input_blob : image})
+        self.wait(exec_network)
+        
+        self.exec_network = exec_network
+        
+        ### TODO: Return any necessary information ###
+        ### Note: You may need to update the function parameters. ###
+        return exec_network
+
+
 
     def get_output(self):
         ### TODO: Extract and return the output results
         ### Note: You may need to update the function parameters. ###
         return self.exec_network.requests[0].outputs[self.output_blob]
+    
+

@@ -1,45 +1,13 @@
-"""People Counter."""
-"""
- Copyright (c) 2018 Intel Corporation.
- Permission is hereby granted, free of charge, to any person obtaining
- a copy of this software and associated documentation files (the
- "Software"), to deal in the Software without restriction, including
- without limitation the rights to use, copy, modify, merge, publish,
- distribute, sublicense, and/or sell copies of the Software, and to
- permit person to whom the Software is furnished to do so, subject to
- the following conditions:
- The above copyright notice and this permission notice shall be
- included in all copies or substantial portions of the Software.
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-"""
-
-
-import os
-import sys
+import argparse
+import cv2
+from inference import Network
+import numpy as np
 import time
 import socket
 import json
-import cv2
-
 import logging as log
 import paho.mqtt.client as mqtt
-
-from argparse import ArgumentParser
-from inference import Network
-
-
-# MQTT server environment variables
-HOSTNAME = socket.gethostname()
-IPADDRESS = socket.gethostbyname(HOSTNAME)
-MQTT_HOST = IPADDRESS
-MQTT_PORT = 3001
-MQTT_KEEPALIVE_INTERVAL = 60
+import sys #for ffmpeg server
 
 
 def build_argparser():
@@ -49,12 +17,12 @@ def build_argparser():
     :return: command line arguments
     """
     parser = ArgumentParser()
-    parser.add_argument("-m", "--model", required=False, type=str, default = "tf_model/frozen_inference_graph.xml",
+    parser.add_argument("-m", "--model", required=True, type=str,
                         help="Path to an xml file with a trained model.")
-    parser.add_argument("-i", "--input", required=False, type=str, default = "resources/Pedestrian_Detect_2_1_1.mp4",
+    parser.add_argument("-i", "--input", required=True, type=str,
                         help="Path to image or video file")
     parser.add_argument("-l", "--cpu_extension", required=False, type=str,
-                        default="/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so",
+                        default=None,
                         help="MKLDNN (CPU)-targeted custom layers."
                              "Absolute path to a shared library with the"
                              "kernels impl.")
@@ -63,11 +31,61 @@ def build_argparser():
                              "CPU, GPU, FPGA or MYRIAD is acceptable. Sample "
                              "will look for a suitable plugin for device "
                              "specified (CPU by default)")
-    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.3,
+    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
                         help="Probability threshold for detections filtering"
-                        "(0.3 by default)")
+                        "(0.5 by default)")
     return parser
 
+from argparse import ArgumentParser
+
+# MQTT server environment variables
+HOSTNAME = socket.gethostname()
+IPADDRESS = socket.gethostbyname(HOSTNAME)
+MQTT_HOST = IPADDRESS
+MQTT_PORT = 3001
+MQTT_KEEPALIVE_INTERVAL = 60
+
+
+INPUT_STREAM = "resources/Pedestrian_Detect_2_1_1.mp4"
+CPU_EXTENSION = "/opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so"
+OB_MODEL = "/home/workspace/model/MobileNetSSD_deploy10695.xml"
+
+def connect_mqtt():
+    ### TODO: Connect to the MQTT client ###
+    client = mqtt.Client()
+    client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_INTERVAL)
+
+    return client
+
+
+def get_args():
+    '''
+    Gets the arguments from the command line.
+    '''
+    parser = argparse.ArgumentParser("Run inference on an input video")
+    # -- Create the descriptions for the commands
+    m_desc = "The location of the model XML file"
+    i_desc = "The location of the input file"
+    d_desc = "The device name, if not 'CPU'"
+    ### TODO: Add additional arguments and descriptions for:
+    ###       1) Different confidence thresholds used to draw bounding boxes
+    ###       
+    pt_desc = "The confidence threshold to use with the bounding boxes"
+
+    # -- Add required and optional groups
+    parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
+    optional = parser.add_argument_group('optional arguments')
+
+    # -- Create the arguments
+    required.add_argument("-m", help=m_desc, required=False, default = OB_MODEL)
+    optional.add_argument("-i", help=i_desc, default=INPUT_STREAM)
+    optional.add_argument("-d", help=d_desc, default='CPU')
+    optional.add_argument("-pt", help=pt_desc, default=0.3)
+    optional.add_argument("-l", help = "extention", default = CPU_EXTENSION )
+    args = parser.parse_args()
+
+    return args
 
 def get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client):
     
@@ -83,7 +101,8 @@ def get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client)
         if diff >= frame_thresh:
             stat['is_person_present'] = False
             stat['end_frame'] = frame_no
-            publish_frame_duration = stat['frame_duration']/10 #get duration by dividing by frame rate
+            publish_frame_duration = stat['frame_duration']/10
+#             publish_frame_duration = publish_frame_duration / 10 # 10 is frame rate of video
             client.publish("person/duration",json.dumps({"duration": publish_frame_duration}))
             stat['frame_duration'] = 0
             stat['frame_buffer'] = 0
@@ -98,18 +117,25 @@ def get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client)
     return stat, people_count
 
 
-def draw_boxes(frame, result, args, width, height,prob_threshold, person_detected):#draw boxes
 
-    for box in result[0][0]: #output shape is 1x1x100x7
-        if int(box[1]) == 1: # class is human
-            conf = box[2] #confidence score
-            if conf >= 0.3:
+
+def draw_boxes(frame, result, args, width, height, prob_threshold, person_detected):
+    '''
+    Draw bounding boxes onto the frame.
+    '''
+    person_detected = False
+    for box in result[0][0]: # Output shape is 1x1x100x7
+
+        if int(box[1]) == 1 :
+            conf = box[2]
+            if conf >= prob_threshold:
                 person_detected = True
                 xmin = int(box[3] * width)
                 ymin = int(box[4] * height)
                 xmax = int(box[5] * width)
                 ymax = int(box[6] * height)
-                cv2.recangle(frame, (xmin, ymin), (xmax, ymax),(0,0,255), 1)
+                cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0,0,255,1))
+
     return frame, person_detected
 
 
@@ -121,7 +147,7 @@ def connect_mqtt():
     return client
 
 
-def infer_on_stream(args, client):
+def infer_on_stream(args,client):
     """
     Initialize the inference network, stream video to network,
     and output stats and video.
@@ -130,74 +156,72 @@ def infer_on_stream(args, client):
     :param client: MQTT client
     :return: None
     """
-    """
-    variables to use
-    """
-    frame_no = 0 #keep track of current frame number
-    
-    #stores the calculated stats
-    stat = {'is_person_present' : False, 
+    frame_no = 0
+    stat = {'is_person_present' : False,
             'begin_frame' : 0,
             'end_frame' : 0,
             'frame_duration' : 0,
             'frame_buffer' : 0}
-    person_detected = False #true if person got detected in current frame
-    people_count = 0 #total number of people counted
-    frame_thresh = 25 #to avoid error in people count
-    prev_total_count = 0 # total count in previous frame
-    curr_total_count = 0 # total count in current frame
-    last_count = 0 # no. of people counted in previous frame
-    current_count = 0 # no.of people counted in current frame
-    
+    person_detected = False
+    people_count = 0
+    frame_thresh = 15
+    prev_total_count = 0
+    curr_total_count = 0 
+    last_count = 0
+    current_count = 0
+
     
     # Initialise the class
     infer_network = Network()
     # Set Probability threshold for detections
-    prob_threshold = args.prob_threshold
+    prob_threshold = args.pt  #args.prob_threshold hardcoded for testing
 
-    # Load the model through `infer_network`
-    infer_network.load_model(args.model,args)
+    ### TODO: Load the model through `infer_network` ###
+    infer_network.load_model(args)
     net_input_shape = infer_network.get_input_shape()
-    # Handle the input stream 
-    cap = cv2.VideoCapture(args.input)
-    # Get and open video capture
+    ### TODO: Handle the input stream ###
     
-    cap.open(args.input)
+    # Get and open video capture
+    cap = cv2.VideoCapture(args.i)
+    cap.open(args.i)
     # Grab the shape of the input 
     width = int(cap.get(3))
     height = int(cap.get(4))
     # Create a video writer for the output video
     out = cv2.VideoWriter('out.mp4', 0x00000021, 30, (width,height))
-    
-    # Loop until stream is over 
+    k = 0
+    ### TODO: Loop until stream is over ###
     while cap.isOpened():
         ### TODO: Read from the video capture ###
         
         # Read the next frame
         flag, frame = cap.read()
+        
+        
+        
         if not flag:
             break
+            
+
         key_pressed = cv2.waitKey(60)
         
-        # Pre-process the image as needed 
+        ### TODO: Pre-process the image as needed ###
 
         p_frame = cv2.resize(frame, (net_input_shape[3], net_input_shape[2]))
         p_frame = p_frame.transpose((2,0,1))
         p_frame = p_frame.reshape(1, *p_frame.shape)        
         
-        # Start asynchronous inference for specified request 
+        ### TODO: Start asynchronous inference for specified request ###
   
         tmp_net = infer_network.exec_net(p_frame)# tmp_net = exec_net 
-
-        # Wait for the result
+        
+        ### TODO: Wait for the result ###
         if infer_network.wait(tmp_net) == 0:
-            #  Get the results of the inference request
-            result = infer_network.get_output()
-            resframe, person_detected = draw_boxes(frame, result, args, width, height, prob_threshold,person_detected)
+            result = infer_network.get_output()              
+            resframe,person_detected = draw_boxes(frame, result, args, width, height,prob_threshold,person_detected)
             
-           # write output frame
-            out.write(resframe)
-           # Extract desired stats from the results
+            frame_no +=1
+            
             stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client)
             
             last_count = current_count
@@ -208,42 +232,56 @@ def infer_on_stream(args, client):
             total_count = people_count
             prev_total_count = curr_total_count
             curr_total_count = total_count
+#             duration = int(stat['frame_duration']/24)
             
-            ### send information to the MQTT server ###
-            # When new person enters the video
-            if current_count > last_count:
-                client.publish("person", json.dumps({"total": total_count}))
-                
+
+            
+            # Person duration in the video is calculated
+#             if current_count < last_count:
+#                 duration = int(time.time() - start_time)
+                # Publish messages to the MQTT server
+#                 client.publish("person/duration",
+#                                json.dumps({"duration": duration}))
+             
             client.publish("person", json.dumps({"count": current_count}))
             
-            # break if escape key is pressed
-            # Send the frame to the FFMPEG server
+            
+            resStr = 'stats is {} \n person counted = {}'.format(stat, people_count)
+            cv2.putText(resframe,resStr, (50,50), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
+            out.write(resframe)
+            #break if escape key is pressed
+            ### current_count, total_count and duration to the MQTT server ###
+
+#             print('current count:{}  total_count:{}  duration:{}'.format(current_count, total_count, duration))
+#             client.publish("person", json.dumps({"count": current_count, "total": total_count}))
+#             client.publish("person/duration", json.dumps({"duration": duration}))
+            
+            ### TODO: Send the frame to the FFMPEG server ###
+            # When new person enters the video
+            if current_count > last_count:
+#                 start_time = time.time()
+                total_count = total_count + current_count - last_count
+                client.publish("person", json.dumps({"total": total_count}))
+            
             sys.stdout.buffer.write(frame)  
             sys.stdout.flush()
-            print('hii')
+            
             if key_pressed == 27:
                 break
-
-        ### TODO: Write an output image if `single_image_mode` ### #fixme
-        out.release()
-        client.disconnect()
-        cap.release()
-        return
+    out.release()
+    client.disconnect()
+    cap.release()
+#     print('stats is {} \n person counted = {}'.format(stat, people_count))
+    return
 
 
 def main():
-    """
-    Load the network and parse the output.
-
-    :return: None
-    """
-    # Grab command line args
-    args = build_argparser().parse_args()
-    # Connect to the MQTT server
+    args = get_args() # FIXME add Build_parser
+#     args = build_argparser().parse_args()
     client = connect_mqtt()
-    # Perform inference on the input stream
-    infer_on_stream(args, client)
+    infer_on_stream(args,client)
+#     infer_on_stream(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
