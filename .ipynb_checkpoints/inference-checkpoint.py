@@ -50,8 +50,10 @@ class Network:
     def load_model(self, args):
         ### TODO: Load the model ###
         plugin = IECore()
-        model_xml = "tf_model/frozen_inference_graph.xml"
-        model_bin = "tf_model/frozen_inference_graph.bin"
+#         model_xml = "frozen_inference_graph.xml"
+#         model_bin = "frozen_inference_graph.bin"
+        model_xml = args.m
+        model_bin = os.path.splitext(model_xml)[0] + ".bin"
         net = IENetwork(model=model_xml, weights=model_bin)
 #         plugin.add_extension(CPU_EXTENSION, "CPU")
         
