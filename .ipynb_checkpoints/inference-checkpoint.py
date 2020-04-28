@@ -58,9 +58,7 @@ class Network:
         
         unsupported_layers = [l for l in net.layers.keys() if l not in supported_layers]
         if len(unsupported_layers) != 0:
-            print("Unsupported layers found: {}".format(unsupported_layers))
-            print("Check whether extensions are available to add to IECore.")
-            plugin.add_extension(args.cpu_extension, "")#must add
+            plugin.add_extension(args.cpu_extension,"CPU")#must add
         # Add any necessary extensions #
         
         

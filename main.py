@@ -33,7 +33,6 @@ import paho.mqtt.client as mqtt
 from argparse import ArgumentParser
 from inference import Network
 
-OB_MODEL = "/home/workspace/model/MobileNetSSD_deploy10695.xml"
 
 # MQTT server environment variables
 HOSTNAME = socket.gethostname()
@@ -64,25 +63,56 @@ def build_argparser():
                              "CPU, GPU, FPGA or MYRIAD is acceptable. Sample "
                              "will look for a suitable plugin for device "
                              "specified (CPU by default)")
-    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.5,
+    parser.add_argument("-pt", "--prob_threshold", type=float, default=0.3,
                         help="Probability threshold for detections filtering"
                         "(0.5 by default)")
     return parser
+
+
+def get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client):
+    
+    if stat['is_person_present'] is False and person_detected is True :
+        stat['is_person_present'] = True
+        stat['begin_frame'] = frame_no
+        stat['end_frame'] = 0
+        stat['frame_duration'] = 1
+        people_count += 1
+
+    if stat['is_person_present'] is True and person_detected is False:
+        diff =frame_no - (stat['begin_frame'] + stat['frame_duration'])
+        if diff >= frame_thresh:
+            stat['is_person_present'] = False
+            stat['end_frame'] = frame_no
+            publish_frame_duration = stat['frame_duration']/10 #get duration by dividing by frame rate
+            client.publish("person/duration",json.dumps({"duration": publish_frame_duration}))
+            stat['frame_duration'] = 0
+            stat['frame_buffer'] = 0
+
+        else:
+            stat['frame_buffer'] += 1
+
+    if stat['is_person_present'] is True and person_detected is True :
+        stat['frame_duration'] = stat['frame_duration'] + 1 + stat['frame_buffer']
+        stat['frame_buffer']  = 0  
+   
+    return stat, people_count
+
 
 def draw_boxes(frame, result, args, width, height,prob_threshold, person_detected):#draw boxes
     '''
     draw bounding boxes onto the frame
     '''
     for box in result[0][0]: #output shape is 1x1x100x7
-        conf = box[2] #confidence score
-        '''box[1] contain class'''
-        if conf >= prob_threshold:
-            xmin = int(box[3] * width)
-            ymin = int(box[4] * height)
-            xmax = int(box[5] * width)
-            ymax = int(box[6] * height)
-            cv2.recangle(frame, (xmin, ymin), (xmax, ymax),(0,0,255), 1)
-    return frame
+        if int(box[1]) == 1: # class is human
+            conf = box[2] #confidence score
+            if conf >= 0.3:
+                person_detected = True
+                xmin = int(box[3] * width)
+                ymin = int(box[4] * height)
+                xmax = int(box[5] * width)
+                ymax = int(box[6] * height)
+                cv2.recangle(frame, (xmin, ymin), (xmax, ymax),(0,0,255), 1)
+    return frame, person_detected
 
 
 def connect_mqtt():
@@ -131,10 +161,10 @@ def infer_on_stream(args, client):
     infer_network.load_model(args.model,args)
     net_input_shape = infer_network.get_input_shape()
     # Handle the input stream 
-    cap = cv2.VideoCapture(args.i)
+    cap = cv2.VideoCapture(args.input)
     # Get and open video capture
     
-    cap.open(args.i)
+    cap.open(args.input)
     # Grab the shape of the input 
     width = int(cap.get(3))
     height = int(cap.get(4))
@@ -159,18 +189,18 @@ def infer_on_stream(args, client):
         
         # Start asynchronous inference for specified request 
   
-        tmp_net = infer_network.async_inference(p_frame)# tmp_net = exec_net 
+        tmp_net = infer_network.exec_net(p_frame)# tmp_net = exec_net 
 
         # Wait for the result
         if infer_network.wait(tmp_net) == 0:
             #  Get the results of the inference request
             result = infer_network.get_output()
-            resframe, person_detected = draw_boxes(frame, result, args, width, hieght, prob_threshold,person_detected)
+            resframe, person_detected = draw_boxes(frame, result, args, width, height, prob_threshold,person_detected)
             
            # write output frame
             out.write(resframe)
            # Extract desired stats from the results
-            stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected)
+            stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client)
             
             last_count = current_count
             if stat['is_person_present'] == True :
@@ -184,14 +214,7 @@ def infer_on_stream(args, client):
             ### send information to the MQTT server ###
             # When new person enters the video
             if current_count > last_count:
-                start_time = time.time()
-                total_count = total_count + current_count - last_count
                 client.publish("person", json.dumps({"total": total_count}))
-            # Person duration in the video is calculated
-            if current_count < last_count:
-                duration = int(time.time() - start_time)
-                # Publish messages to the MQTT server
-                client.publish("person/duration",json.dumps({"duration": duration}))
                 
             client.publish("person", json.dumps({"count": current_count}))
             
