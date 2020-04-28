@@ -60,7 +60,7 @@ class Network:
         
         unsupported_layers = [l for l in net.layers.keys() if l not in supported_layers]
         if len(unsupported_layers) != 0:
-            plugin.add_extension(CPU_EXTENSION, "CPU")
+            plugin.add_extension(args.l, "CPU")
             
             
         ### TODO: Add any necessary extensions ###
