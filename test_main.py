@@ -88,7 +88,7 @@ def get_args():
 
     return args
 
-def get_stat(stat, frame_no, people_count, frame_thresh, person_detected):
+def get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client):
     
     if stat['is_person_present'] is False and person_detected is True :
         stat['is_person_present'] = True
@@ -102,6 +102,9 @@ def get_stat(stat, frame_no, people_count, frame_thresh, person_detected):
         if diff >= frame_thresh:
             stat['is_person_present'] = False
             stat['end_frame'] = frame_no
+            publish_frame_duration = stat['frame_duration']/10
+#             publish_frame_duration = publish_frame_duration / 10 # 10 is frame rate of video
+            client.publish("person/duration",json.dumps({"duration": publish_frame_duration}))
             stat['frame_duration'] = 0
             stat['frame_buffer'] = 0
 
@@ -220,7 +223,7 @@ def infer_on_stream(args,client):
             
             frame_no +=1
             
-            stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected)
+            stat, people_count = get_stat(stat, frame_no, people_count, frame_thresh, person_detected,client)
             
             last_count = current_count
             if stat['is_person_present'] == True :
@@ -232,18 +235,14 @@ def infer_on_stream(args,client):
             curr_total_count = total_count
 #             duration = int(stat['frame_duration']/24)
             
-# When new person enters the video
-            if current_count > last_count:
-                start_time = time.time()
-                total_count = total_count + current_count - last_count
-                client.publish("person", json.dumps({"total": total_count}))
+
             
             # Person duration in the video is calculated
-            if current_count < last_count:
-                duration = int(time.time() - start_time)
+#             if current_count < last_count:
+#                 duration = int(time.time() - start_time)
                 # Publish messages to the MQTT server
-                client.publish("person/duration",
-                               json.dumps({"duration": duration}))
+#                 client.publish("person/duration",
+#                                json.dumps({"duration": duration}))
              
             client.publish("person", json.dumps({"count": current_count}))
             
@@ -259,6 +258,11 @@ def infer_on_stream(args,client):
 #             client.publish("person/duration", json.dumps({"duration": duration}))
             
             ### TODO: Send the frame to the FFMPEG server ###
+            # When new person enters the video
+            if current_count > last_count:
+#                 start_time = time.time()
+                total_count = total_count + current_count - last_count
+                client.publish("person", json.dumps({"total": total_count}))
             
             sys.stdout.buffer.write(frame)  
             sys.stdout.flush()

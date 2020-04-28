@@ -1,1 +1,3 @@
 python /opt/intel/openvino/deployment_tools/model_optimizer/mo.py --input_model MobileNetSSD_deploy10695.caffemodel --input_proto MobileNetSSD_deploy.prototxt
+
+10 fps video
