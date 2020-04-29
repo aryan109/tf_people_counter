@@ -23,14 +23,21 @@ The inference time of the model pre- and post-conversion was...
 
 ## Assess Model Use Cases
 
-Some of the potential use cases of the people counter app are...
+Some of the potential use cases of the people counter app are :-
+1) During the lockdown period ,this app can be used to locate those areas where more number of people are accumulating and voilating lockdown.
+2) Counting the number of people in real time in a particular frame to get an estimate of rush in the store.
+3) find the average duration of time spent by coustmers in a store.
+4) finding the peak rush hours in a store.
 
-Each of these use cases would be useful because...
+Each of these use cases would be useful because it will help in improving the profitability and do survilliance in very effective and efficient manner.
+
+
 
 ## Assess Effects on End User Needs
 
-Lighting, model accuracy, and camera focal length/image size have different effects on a
-deployed edge model. The potential effects of each of these are as follows...
+Lighting, model accuracy, and camera focal length/image size have different effects on a deployed edge model. The potential effects of each of these are as follows:-
+
+for this application to be effective there should be a good amount of lightning present and artificial lightning can be provided during low light conditions. 
 
 ## Model Research
 
