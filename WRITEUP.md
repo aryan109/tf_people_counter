@@ -1,9 +1,5 @@
 # Project Write-Up
 
-You can use this document as a template for providing your project write-up. However, if you
-have a different format you prefer, feel free to use it as long as you answer all required
-questions.
-
 ## Explaining Custom Layers
 
 I have used SSD Mobilenet V2 object detection model from the Tensorflow model zoo. It is pretty fast and small sized model which is ideal for doing inference on videos. 
@@ -19,14 +15,15 @@ while conversion I have used ssd_v2_support.json file and passed it to --tensorf
 
 My method(s) to compare models before and after conversion to Intermediate Representations
 were...
-the size of intermediate representation is: my_model.bin = 65M and my_model.xml = 110K.
+the size of original model is 266M which consist of following contents:
+checkpoint                  frozen_inference_graph.mapping      model.ckpt.index  pipeline.config
+frozen_inference_graph.pb       model.ckpt.data-00000-of-00001  model.ckpt.meta   saved_model
 
+for the converion into IR we require only 2 files from this:
+frozen_inference_graph.pb and pipeline.config
+after the conversion the size of intermediate representation is: my_model.bin = 65M and my_model.xml = 110K.
 
-The difference between model accuracy pre- and post-conversion was...
-
-The size of the model pre- and post-conversion was...
-
-The inference time of the model pre- and post-conversion was...
+due to the optimized Intermediate Representation of the model inference time is reduced by about 7%
 
 ## Assess Model Use Cases
 
@@ -50,30 +47,3 @@ I have used SSD Mobilenet V2 model which is has very less inference time along w
 
 This app is created such that, at before doing the inference the video frame is resized according to the input shape to model. Standard frame size like (640 x 420) and (1280 x 720)
 are recommended for optimal results.
-
-
-## Model Research
-
-[This heading is only required if a suitable model was not found after trying out at least three
-different models. However, you may also use this heading to detail how you converted 
-a successful model.]
-
-In investigating potential people counter models, I tried each of the following three models:
-
-- Model 1: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
-  
-- Model 2: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
-
-- Model 3: [Name]
-  - [Model Source]
-  - I converted the model to an Intermediate Representation with the following arguments...
-  - The model was insufficient for the app because...
-  - I tried to improve the model for the app by...
