@@ -6,14 +6,21 @@ questions.
 
 ## Explaining Custom Layers
 
-The process behind converting custom layers involves...
+I have used SSD Mobilenet V2 object detection model from the Tensorflow model zoo. It is pretty fast and small sized model which is ideal for doing inference on videos. 
 
-Some of the potential reasons for handling custom layers are...
+To convert the model into it's intermediate representation i have used following command:-
+python /opt/intel/openvino/deployment_tools/model_optimizer/mo.py --input_model frozen_inference_graph.pb --tensorflow_object_detection_api_pipeline_config pipeline.config --reverse_input_channels --tensorflow_use_custom_operations_config /opt/intel/openvino/deployment_tools/model_optimizer/extensions/front/tf/ssd_v2_support.json
+
+the complete steps to convert model is present in model.ipynb file.
+
+while conversion I have used ssd_v2_support.json file and passed it to --tensorflow_use_custom_operations_config paraameter. 
 
 ## Comparing Model Performance
 
 My method(s) to compare models before and after conversion to Intermediate Representations
 were...
+the size of intermediate representation is: my_model.bin = 65M and my_model.xml = 110K.
+
 
 The difference between model accuracy pre- and post-conversion was...
 
@@ -37,7 +44,13 @@ Each of these use cases would be useful because it will help in improving the pr
 
 Lighting, model accuracy, and camera focal length/image size have different effects on a deployed edge model. The potential effects of each of these are as follows:-
 
-for this application to be effective there should be a good amount of lightning present and artificial lightning can be provided during low light conditions. 
+for this application to be effective there should be a good amount of lightning present and artificial lightning can be provided during low light conditions.
+
+I have used SSD Mobilenet V2 model which is has very less inference time along with pretty good accuracy. This model can predict big objects like humans in this case pretty easily with above 90% accuracy. This model is very suitable for detection on video streams due to its less inference time.
+
+This app is created such that, at before doing the inference the video frame is resized according to the input shape to model. Standard frame size like (640 x 420) and (1280 x 720)
+are recommended for optimal results.
+
 
 ## Model Research
 
