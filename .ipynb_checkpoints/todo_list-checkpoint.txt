@@ -1,0 +1,5 @@
+1) change average duraation code
+2) use better model with high accuracy
+problem : incorrect avg-duration,
+           
+        
